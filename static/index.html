@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>RPi Link</title>
+<style>
+/* ── RESET & TOKENS ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:       #07090e;
+  --surface:  #0e1118;
+  --raised:   #141820;
+  --border:   #1c2330;
+  --accent:   #3b82f6;
+  --accent2:  #06b6d4;
+  --green:    #22c55e;
+  --amber:    #f59e0b;
+  --red:      #ef4444;
+  --text:     #e2e8f0;
+  --sub:      #64748b;
+  --mono:     'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --ui:       'DM Sans', system-ui, sans-serif;
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+  --tab-h: 56px;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui);
+  height: 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ── TOPBAR ─────────────────────────────────────────────── */
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  height: calc(var(--safe-top) + 52px);
+  padding-top: var(--safe-top);
+  background: rgba(7,9,14,0.95);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding-left: calc(var(--safe-left) + 16px);
+  padding-right: calc(var(--safe-right) + 16px);
+  gap: 12px;
+}
+.logo-mark {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  display: grid; place-items: center; font-size: 16px;
+}
+.logo-text { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.logo-sub  { font-size: 11px; color: var(--sub); font-family: var(--mono); }
+.hfill     { flex: 1; }
+
+.badge {
+  padding: 3px 8px; border-radius: 20px;
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.5px; white-space: nowrap;
+}
+.badge-blue   { background: rgba(59,130,246,0.15); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+.badge-green  { background: rgba(34,197,94,0.12);  color: var(--green);  border: 1px solid rgba(34,197,94,0.25); }
+.badge-red    { background: rgba(239,68,68,0.12);   color: var(--red);    border: 1px solid rgba(239,68,68,0.25); }
+.badge-amber  { background: rgba(245,158,11,0.12);  color: var(--amber);  border: 1px solid rgba(245,158,11,0.25); }
+
+#fps-badge { margin-right: 4px; }
+
+/* ── TABS ───────────────────────────────────────────────── */
+#tabbar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+  height: calc(var(--tab-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(7,9,14,0.96);
+  backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+.tab {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  height: var(--tab-h); cursor: pointer; transition: opacity 0.15s;
+  border: none; background: none; color: var(--sub);
+  font-family: var(--ui); font-size: 10px; font-weight: 500;
+}
+.tab .tab-ico { font-size: 20px; line-height: 1; }
+.tab.active { color: var(--accent); }
+.tab:active { opacity: 0.6; }
+
+/* ── PAGES ──────────────────────────────────────────────── */
+.page {
+  position: fixed; inset: 0;
+  padding-top: calc(var(--safe-top) + 52px);
+  padding-bottom: calc(var(--tab-h) + var(--safe-bottom));
+  overflow-y: auto; overflow-x: hidden;
+  display: none;
+}
+.page.active { display: block; }
+#page-screen { overflow: hidden; padding: 0; }
+
+/* ── SCREEN PAGE ─────────────────────────────────────────── */
+#screen-container {
+  width: 100%; height: 100%;
+  background: #000;
+  position: relative; overflow: hidden;
+  cursor: crosshair;
+  touch-action: none; /* we handle all touch */
+}
+#screen-img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  image-rendering: -webkit-optimize-contrast;
+}
+#screen-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(7,9,14,0.9); gap: 12px;
+  transition: opacity 0.3s;
+}
+#screen-overlay.hidden { opacity: 0; pointer-events: none; }
+.overlay-icon { font-size: 48px; }
+.overlay-text { font-size: 14px; color: var(--sub); font-family: var(--mono); }
+.overlay-btn {
+  padding: 10px 24px; border-radius: 8px;
+  background: var(--accent); color: #fff;
+  border: none; font-family: var(--ui); font-size: 14px; font-weight: 600;
+  cursor: pointer; margin-top: 4px;
+}
+
+/* Screen toolbar */
+#screen-toolbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: 10px 12px;
+  display: flex; gap: 8px; align-items: center;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+#screen-container:hover #screen-toolbar,
+#screen-toolbar.show { opacity: 1; pointer-events: all; }
+
+.scr-btn {
+  padding: 6px 12px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.85);
+  font-family: var(--mono); font-size: 11px; cursor: pointer;
+  backdrop-filter: blur(8px); white-space: nowrap;
+  transition: background 0.15s;
+}
+.scr-btn:active, .scr-btn.active { background: rgba(59,130,246,0.5); border-color: var(--accent); }
+.scr-btn.red:active { background: rgba(239,68,68,0.5); }
+
+/* Touch cursor indicator */
+#touch-cursor {
+  position: absolute; pointer-events: none;
+  width: 20px; height: 20px; margin-left: -10px; margin-top: -10px;
+  border-radius: 50%;
+  border: 2px solid rgba(59,130,246,0.8);
+  background: rgba(59,130,246,0.2);
+  display: none;
+  transition: transform 0.05s;
+}
+#touch-cursor.active { display: block; }
+#touch-cursor.pressed {
+  transform: scale(0.7);
+  background: rgba(59,130,246,0.5);
+}
+
+/* Pencil mode indicator */
+#pencil-mode-badge {
+  position: absolute; bottom: 12px; right: 12px;
+  padding: 4px 10px; border-radius: 20px;
+  background: rgba(59,130,246,0.15);
+  border: 1px solid rgba(59,130,246,0.4);
+  color: var(--accent); font-family: var(--mono); font-size: 11px;
+  display: none;
+}
+#pencil-mode-badge.show { display: block; }
+
+/* ── AUDIO BAR ───────────────────────────────────────────── */
+#audio-bar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 8px 12px;
+  background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+  display: flex; align-items: center; gap: 10px;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none;
+}
+#screen-container:hover #audio-bar,
+#audio-bar.show { opacity: 1; pointer-events: all; }
+
+.vol-label { font-size: 16px; }
+#vol-slider {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 3px; border-radius: 2px;
+  background: rgba(255,255,255,0.2); outline: none; cursor: pointer;
+}
+#vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+}
+.audio-status {
+  font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.5);
+}
+
+/* ── STATS PAGE ──────────────────────────────────────────── */
+.page-content { padding: 16px; max-width: 900px; margin: 0 auto; }
+
+.section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--sub);
+  font-family: var(--mono); margin: 20px 0 10px;
+}
+.section-title:first-child { margin-top: 0; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+  margin-bottom: 12px;
+}
+.card-row {
+  display: flex; align-items: center;
+  padding: 12px 16px; gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.card-row:last-child { border-bottom: none; }
+.row-icon { font-size: 18px; width: 28px; text-align: center; }
+.row-label { color: var(--sub); font-family: var(--mono); font-size: 12px; min-width: 80px; }
+.row-val   { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text); }
+.row-right { margin-left: auto; }
+.row-bar   { flex: 1; }
+
+.mini-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.mini-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s; }
+
+/* Stat grid */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px; }
+.stat-cell {
+  background: var(--raised); border-radius: 10px; padding: 14px;
+  border: 1px solid var(--border);
+}
+.stat-lbl { font-size: 10px; color: var(--sub); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.stat-num { font-size: 28px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+.stat-sub { font-size: 10px; color: var(--sub); font-family: var(--mono); margin-top: 4px; }
+.stat-bar { margin-top: 8px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.stat-bar-f { height: 100%; border-radius: 2px; transition: width 0.6s; }
+
+/* Proc table */
+.proc-scroll { overflow-x: auto; }
+table.proc {
+  width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px;
+}
+table.proc th { color: var(--sub); font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+  padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+table.proc td { padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+table.proc tr:last-child td { border-bottom: none; }
+
+/* ── FILES PAGE ───────────────────────────────────────────── */
+#files-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: var(--surface);
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+}
+#path-display {
+  flex: 1; font-family: var(--mono); font-size: 12px; color: var(--accent2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.icon-btn {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--text); font-size: 15px;
+  cursor: pointer; display: grid; place-items: center;
+  transition: background 0.15s; flex-shrink: 0;
+}
+.icon-btn:active { background: var(--raised); }
+
+/* Upload zone */
+#drop-zone {
+  margin: 12px 14px;
+  border: 2px dashed var(--border); border-radius: 10px;
+  padding: 16px; text-align: center;
+  font-size: 12px; color: var(--sub); font-family: var(--mono);
+  cursor: pointer; transition: border-color 0.2s, background 0.2s;
+}
+#drop-zone.drag-over { border-color: var(--accent); background: rgba(59,130,246,0.05); }
+#file-input { display: none; }
+
+/* File list */
+.file-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  cursor: pointer; transition: background 0.12s;
+  user-select: none;
+}
+.file-item:last-child { border-bottom: none; }
+.file-item:active { background: var(--raised); }
+.file-item.selected { background: rgba(59,130,246,0.08); }
+
+.file-ico { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+.file-name { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-meta { font-family: var(--mono); font-size: 10px; color: var(--sub); white-space: nowrap; }
+
+.file-actions {
+  display: flex; gap: 6px;
+}
+.file-act-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--sub); font-size: 11px;
+  cursor: pointer; font-family: var(--mono); white-space: nowrap;
+}
+.file-act-btn:active { background: var(--raised); }
+.file-act-btn.dl { color: var(--accent); border-color: rgba(59,130,246,0.3); }
+.file-act-btn.del { color: var(--red);   border-color: rgba(239,68,68,0.3); }
+
+/* ── TERMINAL PAGE ────────────────────────────────────────── */
+#term-page { display: flex; flex-direction: column; }
+#term-out {
+  flex: 1; overflow-y: auto; padding: 14px;
+  font-family: var(--mono); font-size: 12px; line-height: 1.6;
+  color: #4ade80; background: var(--bg); white-space: pre-wrap; word-break: break-all;
+}
+#term-input-row {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 14px calc(10px + var(--safe-bottom));
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.term-prompt { font-family: var(--mono); font-size: 13px; color: var(--accent2); white-space: nowrap; }
+#term-in {
+  flex: 1; background: var(--raised); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; color: var(--text);
+  font-family: var(--mono); font-size: 13px; outline: none;
+  caret-color: var(--green); -webkit-user-select: text;
+}
+#term-run {
+  padding: 8px 14px; border-radius: 8px;
+  background: var(--accent); color: #fff; border: none;
+  font-family: var(--mono); font-size: 12px; cursor: pointer;
+}
+#term-run:active { opacity: 0.8; }
+
+/* ── STREAM SETTINGS SHEET ───────────────────────────────── */
+#settings-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+  background: var(--surface); border-top: 1px solid var(--border);
+  border-radius: 16px 16px 0 0; padding: 20px 20px calc(20px + var(--safe-bottom));
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+#settings-sheet.open { transform: translateY(0); }
+.sheet-title { font-size: 15px; font-weight: 700; margin-bottom: 18px; }
+.sheet-row { display: flex; align-items: center; margin-bottom: 16px; gap: 12px; }
+.sheet-label { font-size: 13px; color: var(--sub); min-width: 100px; font-family: var(--mono); }
+.sheet-val { font-family: var(--mono); font-size: 13px; color: var(--accent); min-width: 40px; }
+input[type=range] {
+  flex: 1; -webkit-appearance: none; height: 3px;
+  border-radius: 2px; background: var(--border); outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+}
+.sheet-apply {
+  width: 100%; padding: 12px; border-radius: 10px;
+  background: var(--accent); color: #fff; border: none;
+  font-family: var(--ui); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 6px;
+}
+#sheet-backdrop {
+  position: fixed; inset: 0; z-index: 299;
+  background: rgba(0,0,0,0.5); display: none;
+}
+#sheet-backdrop.open { display: block; }
+
+/* ── SCROLLBAR ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── TOAST ───────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: calc(var(--tab-h) + var(--safe-bottom) + 12px);
+  left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--raised); border: 1px solid var(--border);
+  border-radius: 20px; padding: 8px 18px;
+  font-family: var(--mono); font-size: 12px; color: var(--text);
+  opacity: 0; transition: all 0.2s; z-index: 500; white-space: nowrap;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── ANIMATIONS ──────────────────────────────────────────── */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.pulse { animation: pulse 2s infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ─────────────────────────────────────────── -->
+<div id="topbar">
+  <div class="logo-mark">🍓</div>
+  <div>
+    <div class="logo-text">RPi Link</div>
+    <div class="logo-sub" id="host-sub">connecting…</div>
+  </div>
+  <div class="hfill"></div>
+  <span class="badge badge-amber" id="fps-badge">— fps</span>
+  <span class="badge badge-red"   id="conn-badge">OFFLINE</span>
+</div>
+
+<!-- ── PAGES ──────────────────────────────────────────────── -->
+
+<!-- SCREEN -->
+<div class="page active" id="page-screen">
+  <div id="screen-container">
+    <img id="screen-img" alt="">
+    <div id="screen-overlay">
+      <div class="overlay-icon">📡</div>
+      <div class="overlay-text">Stream not started</div>
+      <button class="overlay-btn" onclick="startStream()">▶ Start Stream</button>
+    </div>
+    <div id="screen-toolbar">
+      <button class="scr-btn active" id="btn-stream"  onclick="toggleStream()">■ Stop</button>
+      <button class="scr-btn"        id="btn-fullscr" onclick="goFullscreen()">⛶ Full</button>
+      <button class="scr-btn"        id="btn-snap"    onclick="snap()">📷 Snap</button>
+      <button class="scr-btn"        id="btn-touch"   onclick="toggleTouch()">✏️ Pencil</button>
+      <button class="scr-btn"        id="btn-kb"      onclick="showKb()">⌨️ Keys</button>
+      <div class="hfill"></div>
+      <button class="scr-btn"        id="btn-settings" onclick="openSettings()">⚙</button>
+    </div>
+    <div id="audio-bar">
+      <span class="vol-label">🔊</span>
+      <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="1" oninput="setVolume(this.value)">
+      <button class="scr-btn" id="btn-audio" onclick="toggleAudio()">🔇 Mute</button>
+      <span class="audio-status" id="audio-status">—</span>
+    </div>
+    <div id="touch-cursor"></div>
+    <div id="pencil-mode-badge">✏️ Pencil Mode</div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="page" id="page-stats">
+  <div class="page-content">
+    <div class="section-title">System</div>
+    <div class="card">
+      <div class="stat-grid">
+        <div class="stat-cell">
+          <div class="stat-lbl">CPU</div>
+          <div class="stat-num" id="s-cpu" style="color:var(--green)">—%</div>
+          <div class="stat-bar"><div class="stat-bar-f" id="s-cpu-bar" style="width:0%;background:var(--green)"></div></div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-lbl">TEMP</div>
+          <div class="stat-num" id="s-temp" style="color:var(--amber)">—°C</div>
+          <div class="stat-bar"><div class="stat-bar-f" id="s-temp-bar" style="width:0%;background:var(--amber)"></div></div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-lbl">RAM</div>
+          <div class="stat-num" id="s-mem" style="color:var(--accent2)">—%</div>
+          <div class="stat-sub" id="s-mem-sub"></div>
+          <div class="stat-bar"><div class="stat-bar-f" id="s-mem-bar" style="width:0%;background:var(--accent2)"></div></div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-lbl">DISK</div>
+          <div class="stat-num" id="s-disk" style="color:var(--accent2)">—</div>
+          <div class="stat-sub" id="s-disk-sub"></div>
+          <div class="stat-bar"><div class="stat-bar-f" id="s-disk-bar" style="width:0%;background:var(--accent2)"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Info</div>
+    <div class="card">
+      <div class="card-row"><span class="row-icon">🖥</span><span class="row-label">hostname</span><span class="row-val" id="i-host">—</span></div>
+      <div class="card-row"><span class="row-icon">⏱</span><span class="row-label">uptime</span>  <span class="row-val" id="i-up">—</span></div>
+      <div class="card-row"><span class="row-icon">🔌</span><span class="row-label">usb ip</span>  <span class="row-val" id="i-ip">—</span></div>
+      <div class="card-row"><span class="row-icon">📡</span><span class="row-label">display</span> <span class="row-val" id="i-disp">—</span></div>
+      <div class="card-row"><span class="row-icon">🗓</span><span class="row-label">date</span>    <span class="row-val" id="i-date">—</span></div>
+      <div class="card-row"><span class="row-icon">↕</span><span class="row-label">net rx/tx</span><span class="row-val" id="i-net">—</span></div>
+    </div>
+
+    <div class="section-title">Processes</div>
+    <div class="card proc-scroll">
+      <table class="proc">
+        <thead><tr><th>Command</th><th>User</th><th>CPU%</th><th>MEM%</th></tr></thead>
+        <tbody id="proc-body"><tr><td colspan="4" style="color:var(--sub)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- FILES -->
+<div class="page" id="page-files">
+  <div id="files-header">
+    <button class="icon-btn" id="btn-back" onclick="filesNav('..')">‹</button>
+    <div id="path-display">/home/pi</div>
+    <button class="icon-btn" onclick="filesRefresh()" title="Refresh">↻</button>
+    <button class="icon-btn" onclick="mkdirPrompt()" title="New folder">📁</button>
+  </div>
+
+  <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <input type="file" id="file-input" multiple onchange="uploadFiles(this.files)">
+    📤 Tap to upload files from iPad → RPi<br>
+    <span style="font-size:10px;color:var(--sub)">or drag files here</span>
+  </div>
+
+  <div id="file-list"></div>
+</div>
+
+<!-- TERMINAL -->
+<div class="page" id="page-term" style="display:none;flex-direction:column">
+  <div id="term-out">$ RPi terminal ready
+$ </div>
+  <div id="term-input-row">
+    <span class="term-prompt">$</span>
+    <input id="term-in" type="text" placeholder="ls, uptime, df -h …"
+           autocorrect="off" autocapitalize="off" spellcheck="false">
+    <button id="term-run" onclick="termRun()">▶</button>
+  </div>
+</div>
+
+<!-- ── TAB BAR ──────────────────────────────────────────── -->
+<div id="tabbar">
+  <button class="tab active" onclick="setTab('screen')">
+    <span class="tab-ico">🖥</span>Screen
+  </button>
+  <button class="tab" onclick="setTab('stats')">
+    <span class="tab-ico">📊</span>Stats
+  </button>
+  <button class="tab" onclick="setTab('files')">
+    <span class="tab-ico">📁</span>Files
+  </button>
+  <button class="tab" onclick="setTab('term')">
+    <span class="tab-ico">💻</span>Terminal
+  </button>
+</div>
+
+<!-- ── SETTINGS SHEET ───────────────────────────────────── -->
+<div id="sheet-backdrop" onclick="closeSettings()"></div>
+<div id="settings-sheet">
+  <div class="sheet-title">Stream Settings</div>
+  <div class="sheet-row">
+    <span class="sheet-label">FPS</span>
+    <input type="range" id="set-fps" min="5" max="30" step="1" value="24"
+           oninput="document.getElementById('set-fps-val').textContent=this.value">
+    <span class="sheet-val" id="set-fps-val">24</span>
+  </div>
+  <div class="sheet-row">
+    <span class="sheet-label">Quality</span>
+    <input type="range" id="set-qual" min="2" max="20" step="1" value="4"
+           oninput="document.getElementById('set-qual-val').textContent=this.value">
+    <span class="sheet-val" id="set-qual-val">4</span>
+  </div>
+  <div class="sheet-row">
+    <span class="sheet-label">Width</span>
+    <input type="range" id="set-width" min="640" max="1920" step="160" value="1280"
+           oninput="document.getElementById('set-width-val').textContent=this.value">
+    <span class="sheet-val" id="set-width-val">1280</span>
+  </div>
+  <button class="sheet-apply" onclick="applySettings()">Apply & Restart Stream</button>
+</div>
+
+<!-- ── TOAST ─────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let streaming    = false;
+let touchEnabled = false;
+let audioActive  = false;
+let audioCtx     = null;
+let audioWs      = null;
+let audioMuted   = false;
+let audioVolume  = 1.0;
+let currentPath  = '/home/' + (location.hostname === 'raspberrypi.local' ? 'pi' : 'pi');
+let fpsCounter   = { frames: 0, last: Date.now() };
+let isDown       = false;   // pointer pressed
+let termHistory  = [];
+let termIdx      = -1;
+
+// ═══════════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════════
+function setTab(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const pg = document.getElementById('page-' + name);
+  if (name === 'term') { pg.style.display = 'flex'; }
+  else { pg.style.display = ''; pg.classList.add('active'); }
+  event.currentTarget.classList.add('active');
+  if (name === 'files') filesRefresh();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STREAM
+// ═══════════════════════════════════════════════════════════
+const img = document.getElementById('screen-img');
+
+function startStream() {
+  streaming = true;
+  // Safari supports MJPEG natively — just set src
+  img.src = '/api/stream?fps=' + document.getElementById('set-fps').value +
+            '&t=' + Date.now();
+  img.onload = () => {
+    document.getElementById('screen-overlay').classList.add('hidden');
+    fpsCounter.frames++; fpsCounter.last = Date.now();
+  };
+  img.onerror = () => { streaming = false; };
+  document.getElementById('btn-stream').textContent = '■ Stop';
+  document.getElementById('btn-stream').classList.add('active');
+  document.getElementById('screen-toolbar').classList.add('show');
+  document.getElementById('audio-bar').classList.add('show');
+  showToolbarTimeout();
+}
+
+function stopStream() {
+  streaming = false;
+  img.src = '';
+  document.getElementById('screen-overlay').classList.remove('hidden');
+  document.getElementById('btn-stream').textContent = '▶ Start';
+  document.getElementById('btn-stream').classList.remove('active');
+}
+
+function toggleStream() { streaming ? stopStream() : startStream(); }
+
+// FPS: count HTTP requests (img reloads) — MJPEG Safari fires onprogress
+// Approximate via polling the img natural dimensions changing
+let _lastW = 0;
+setInterval(() => {
+  if (!streaming) return;
+  const now = Date.now();
+  const elapsed = (now - fpsCounter.last) / 1000;
+  if (img.naturalWidth !== _lastW) {
+    _lastW = img.naturalWidth;
+    fpsCounter.frames++;
+  }
+  if (elapsed >= 2) {
+    const fps = (fpsCounter.frames / elapsed).toFixed(1);
+    document.getElementById('fps-badge').textContent = fps + ' fps';
+    fpsCounter.frames = 0; fpsCounter.last = now;
+  }
+}, 200);
+
+function showToolbarTimeout() {
+  const tb = document.getElementById('screen-toolbar');
+  const ab = document.getElementById('audio-bar');
+  tb.classList.add('show'); ab.classList.add('show');
+  clearTimeout(window._tbTimer);
+  window._tbTimer = setTimeout(() => {
+    if (touchEnabled) return; // keep visible in touch mode
+    tb.classList.remove('show'); ab.classList.remove('show');
+  }, 3500);
+}
+
+function goFullscreen() {
+  const el = document.getElementById('screen-container');
+  (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+}
+
+async function snap() {
+  const r = await fetch('/api/screenshot', {cache:'no-store'});
+  if (!r.ok) { toast('No frame available'); return; }
+  const blob = await r.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'rpi-' + Date.now() + '.jpg'; a.click();
+  URL.revokeObjectURL(url);
+  toast('📷 Saved to Downloads');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════
+function openSettings() {
+  document.getElementById('settings-sheet').classList.add('open');
+  document.getElementById('sheet-backdrop').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settings-sheet').classList.remove('open');
+  document.getElementById('sheet-backdrop').classList.remove('open');
+}
+async function applySettings() {
+  const fps   = parseInt(document.getElementById('set-fps').value);
+  const qual  = parseInt(document.getElementById('set-qual').value);
+  const width = parseInt(document.getElementById('set-width').value);
+  closeSettings();
+  toast('⚙ Restarting stream…');
+  if (streaming) stopStream();
+  await fetch('/api/stream/settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({fps, quality: qual, width})
+  });
+  setTimeout(startStream, 1500);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AUDIO — WebSocket PCM → Web Audio API
+// ═══════════════════════════════════════════════════════════
+const SAMPLE_RATE = 44100, CHANNELS = 2;
+
+function startAudio() {
+  if (audioActive) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = audioVolume;
+  gainNode.connect(audioCtx.destination);
+  window._gainNode = gainNode;
+
+  const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+  audioWs = new WebSocket(`${wsProto}://${location.host}/ws/audio`);
+  audioWs.binaryType = 'arraybuffer';
+
+  let playTime = audioCtx.currentTime + 0.1;
+
+  audioWs.onopen  = () => {
+    audioActive = true;
+    document.getElementById('audio-status').textContent = 'streaming';
+    document.getElementById('btn-audio').textContent = '🔊 Audio';
+  };
+  audioWs.onerror = () => { document.getElementById('audio-status').textContent = 'error'; };
+  audioWs.onclose = () => {
+    audioActive = false;
+    document.getElementById('audio-status').textContent = 'disconnected';
+  };
+
+  audioWs.onmessage = (ev) => {
+    if (audioMuted || !audioActive) return;
+    const raw = ev.data;
+    // s16le interleaved → float32
+    const samples = new Int16Array(raw);
+    const frameCount = samples.length / CHANNELS;
+    const buf = audioCtx.createBuffer(CHANNELS, frameCount, SAMPLE_RATE);
+    for (let ch = 0; ch < CHANNELS; ch++) {
+      const chData = buf.getChannelData(ch);
+      for (let i = 0; i < frameCount; i++) {
+        chData[i] = samples[i * CHANNELS + ch] / 32768.0;
+      }
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(gainNode);
+    const now = audioCtx.currentTime;
+    if (playTime < now) playTime = now + 0.05;
+    src.start(playTime);
+    playTime += buf.duration;
+  };
+}
+
+function stopAudio() {
+  audioWs?.close();
+  audioCtx?.close();
+  audioActive = false;
+  document.getElementById('audio-status').textContent = '—';
+  document.getElementById('btn-audio').textContent = '🔇 Mute';
+}
+
+function toggleAudio() {
+  if (audioActive) {
+    audioMuted = !audioMuted;
+    if (window._gainNode) window._gainNode.gain.value = audioMuted ? 0 : audioVolume;
+    document.getElementById('btn-audio').textContent = audioMuted ? '🔇 Mute' : '🔊 Audio';
+  } else {
+    startAudio();
+  }
+}
+
+function setVolume(v) {
+  audioVolume = parseFloat(v);
+  if (window._gainNode) window._gainNode.gain.value = audioMuted ? 0 : audioVolume;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TOUCH / PENCIL INPUT
+// ═══════════════════════════════════════════════════════════
+const cursor = document.getElementById('touch-cursor');
+
+function toggleTouch() {
+  touchEnabled = !touchEnabled;
+  const btn = document.getElementById('btn-touch');
+  const badge = document.getElementById('pencil-mode-badge');
+  if (touchEnabled) {
+    btn.classList.add('active');
+    badge.classList.add('show');
+    cursor.classList.add('active');
+    toast('✏️ Pencil/Touch mode ON');
+  } else {
+    btn.classList.remove('active');
+    badge.classList.remove('show');
+    cursor.classList.remove('active');
+    isDown = false;
+    toast('Touch mode OFF');
+  }
+}
+
+function getStreamCoords(e, el) {
+  const rect = el.getBoundingClientRect();
+  // account for object-fit:contain letterboxing
+  const nw = img.naturalWidth  || rect.width;
+  const nh = img.naturalHeight || rect.height;
+  const scale = Math.min(rect.width / nw, rect.height / nh);
+  const dispW = nw * scale;
+  const dispH = nh * scale;
+  const offX  = (rect.width  - dispW) / 2;
+  const offY  = (rect.height - dispH) / 2;
+
+  const touch = e.touches ? e.touches[0] || e.changedTouches[0] : e;
+  const px = touch.clientX - rect.left - offX;
+  const py = touch.clientY - rect.top  - offY;
+  return {
+    x: Math.max(0, Math.min(px, dispW)),
+    y: Math.max(0, Math.min(py, dispH)),
+    streamW: dispW, streamH: dispH,
+    isPencil: e.pointerType === 'stylus',
+    pressure: e.pressure || 1.0,
+    rawX: touch.clientX - rect.left,
+    rawY: touch.clientY - rect.top,
+  };
+}
+
+function sendMouse(action, coords, button) {
+  if (!touchEnabled || !streaming) return;
+  fetch('/api/input/mouse', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      action, button: button || 1,
+      x: coords.x, y: coords.y,
+      streamW: Math.round(coords.streamW),
+    })
+  });
+}
+
+// Use Pointer Events API — works for both touch and Apple Pencil
+const sc = document.getElementById('screen-container');
+
+sc.addEventListener('pointerdown', (e) => {
+  if (!touchEnabled) { showToolbarTimeout(); return; }
+  e.preventDefault();
+  sc.setPointerCapture(e.pointerId);
+  isDown = true;
+  const c = getStreamCoords(e, sc);
+  cursor.style.left = c.rawX + 'px';
+  cursor.style.top  = c.rawY + 'px';
+  cursor.classList.add('pressed');
+  // Right-click on long press (pencil barrel button = button 2)
+  const btn = e.button === 2 || (e.pointerType === 'stylus' && e.buttons === 32) ? 3 : 1;
+  sendMouse('down', c, btn);
+}, {passive: false});
+
+sc.addEventListener('pointermove', (e) => {
+  if (!touchEnabled) return;
+  e.preventDefault();
+  const c = getStreamCoords(e, sc);
+  cursor.style.left = c.rawX + 'px';
+  cursor.style.top  = c.rawY + 'px';
+  if (isDown) sendMouse('move', c);
+}, {passive: false});
+
+sc.addEventListener('pointerup', (e) => {
+  if (!touchEnabled) return;
+  e.preventDefault();
+  isDown = false;
+  cursor.classList.remove('pressed');
+  const c = getStreamCoords(e, sc);
+  sendMouse('up', c);
+}, {passive: false});
+
+sc.addEventListener('pointercancel', () => {
+  isDown = false;
+  cursor.classList.remove('pressed');
+});
+
+// Scroll → mouse wheel
+sc.addEventListener('wheel', (e) => {
+  if (!touchEnabled) return;
+  e.preventDefault();
+  const c = getStreamCoords(e, sc);
+  sendMouse('scroll', c, 1, 0, e.deltaY);
+}, {passive: false});
+
+// Double-tap → double click
+let lastTap = 0;
+sc.addEventListener('touchend', (e) => {
+  if (!touchEnabled) return;
+  const now = Date.now();
+  if (now - lastTap < 300) {
+    const c = getStreamCoords(e, sc);
+    sendMouse('click', c, 1);
+    sendMouse('click', c, 1);
+  }
+  lastTap = now;
+});
+
+// ═══════════════════════════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════
+const KEY_MAP = {
+  'Escape':    'Escape',   'Enter': 'Return',  'Backspace': 'BackSpace',
+  'Tab':       'Tab',      'ArrowUp':'Up',     'ArrowDown':'Down',
+  'ArrowLeft': 'Left',     'ArrowRight':'Right',
+  ' ':         'space',
+};
+
+function showKb() {
+  // Show a floating keyboard input
+  const txt = prompt('Type text to send to RPi (or a key name like: ctrl+c, alt+F4):');
+  if (!txt) return;
+  if (txt.includes('+') || /^[A-Z][a-z]+[0-9]?$/.test(txt)) {
+    fetch('/api/input/key', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({key: txt.toLowerCase().replace('ctrl','ctrl').replace('alt','alt')})
+    });
+  } else {
+    fetch('/api/input/type', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text: txt})
+    });
+  }
+}
+
+// Hardware keyboard → xdotool (when screen tab active)
+document.addEventListener('keydown', (e) => {
+  if (!touchEnabled) return;
+  if (document.activeElement !== document.body) return;
+  const key = KEY_MAP[e.key] || e.key;
+  let combo = '';
+  if (e.ctrlKey  && e.key !== 'Control') combo += 'ctrl+';
+  if (e.altKey   && e.key !== 'Alt')     combo += 'alt+';
+  if (e.shiftKey && e.key !== 'Shift')   combo += 'shift+';
+  combo += key;
+  fetch('/api/input/key', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({key: combo})});
+  e.preventDefault();
+});
+
+// ═══════════════════════════════════════════════════════════
+//  STATS POLLING
+// ═══════════════════════════════════════════════════════════
+function fmtBytes(b) {
+  b = parseInt(b)||0;
+  if(b>1e9) return (b/1e9).toFixed(1)+'GB';
+  if(b>1e6) return (b/1e6).toFixed(1)+'MB';
+  if(b>1e3) return (b/1e3).toFixed(0)+'KB';
+  return b+'B';
+}
+
+async function pollStats() {
+  try {
+    const r = await fetch('/api/stats', {cache:'no-store'});
+    const d = await r.json();
+
+    document.getElementById('conn-badge').textContent = 'ONLINE';
+    document.getElementById('conn-badge').className   = 'badge badge-green';
+    document.getElementById('host-sub').textContent   = (d.hostname||'?')+'.local';
+
+    // cpu
+    const cpu = parseFloat(d.cpu)||0;
+    document.getElementById('s-cpu').textContent = cpu.toFixed(1)+'%';
+    document.getElementById('s-cpu-bar').style.width = cpu+'%';
+    const cpuCol = cpu>80?'var(--red)':cpu>50?'var(--amber)':'var(--green)';
+    document.getElementById('s-cpu').style.color = cpuCol;
+    document.getElementById('s-cpu-bar').style.background = cpuCol;
+
+    // temp
+    const temp = parseFloat(d.temp)||0;
+    document.getElementById('s-temp').textContent = temp.toFixed(1)+'°C';
+    document.getElementById('s-temp-bar').style.width = Math.min(temp/85*100,100)+'%';
+    const tCol = temp>75?'var(--red)':temp>60?'var(--amber)':'var(--green)';
+    document.getElementById('s-temp').style.color = tCol;
+    document.getElementById('s-temp-bar').style.background = tCol;
+
+    // mem
+    const m = d.mem||{};
+    document.getElementById('s-mem').textContent  = (m.pct||0)+'%';
+    document.getElementById('s-mem-sub').textContent = `${m.used}MB / ${m.total}MB`;
+    document.getElementById('s-mem-bar').style.width = (m.pct||0)+'%';
+
+    // disk
+    const dk = d.disk||{};
+    document.getElementById('s-disk').textContent = dk.used||'—';
+    document.getElementById('s-disk-sub').textContent = `${dk.used} / ${dk.total}`;
+    document.getElementById('s-disk-bar').style.width = parseInt(dk.pct)||0+'%';
+
+    // info
+    document.getElementById('i-host').textContent = d.hostname||'—';
+    document.getElementById('i-up').textContent   = d.uptime||'—';
+    document.getElementById('i-ip').textContent   = d.usb_ip||'—';
+    document.getElementById('i-disp').textContent = d.display||'—';
+    document.getElementById('i-date').textContent = d.date||'—';
+    const net = d.net||{};
+    document.getElementById('i-net').textContent = `↓${fmtBytes(net.rx)} ↑${fmtBytes(net.tx)}`;
+
+    // procs
+    const tbody = document.getElementById('proc-body');
+    tbody.innerHTML = (d.processes||[]).map(p=>`
+      <tr>
+        <td title="${p.cmd}">${p.cmd}</td>
+        <td style="color:var(--sub)">${p.user}</td>
+        <td style="color:var(--amber)">${p.cpu}%</td>
+        <td style="color:var(--accent2)">${p.mem}%</td>
+      </tr>`).join('') || '<tr><td colspan="4" style="color:var(--sub)">—</td></tr>';
+
+  } catch {
+    document.getElementById('conn-badge').textContent = 'OFFLINE';
+    document.getElementById('conn-badge').className   = 'badge badge-red';
+  }
+}
+pollStats();
+setInterval(pollStats, 4000);
+
+// ═══════════════════════════════════════════════════════════
+//  FILE MANAGER
+// ═══════════════════════════════════════════════════════════
+function fileIcon(entry) {
+  if (entry.is_dir) return '📁';
+  const m = entry.mime;
+  if (!m) return '📄';
+  if (m.startsWith('image/'))  return '🖼';
+  if (m.startsWith('video/'))  return '🎬';
+  if (m.startsWith('audio/'))  return '🎵';
+  if (m.startsWith('text/'))   return '📝';
+  if (m.includes('pdf'))       return '📕';
+  if (m.includes('zip')||m.includes('tar')||m.includes('gzip')) return '📦';
+  if (m.includes('python')||m.includes('javascript')||m.includes('json')) return '⚙️';
+  return '📄';
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes > 1e9) return (bytes/1e9).toFixed(1)+' GB';
+  if (bytes > 1e6) return (bytes/1e6).toFixed(1)+' MB';
+  if (bytes > 1e3) return (bytes/1e3).toFixed(0)+' KB';
+  return bytes + ' B';
+}
+
+function fmtDate(ts) {
+  const d = new Date(ts*1000);
+  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+}
+
+async function filesNav(path) {
+  if (path === '..') {
+    const parts = currentPath.split('/').filter(Boolean);
+    parts.pop();
+    path = '/' + parts.join('/') || '/';
+  }
+  currentPath = path;
+  await filesRefresh();
+}
+
+async function filesRefresh() {
+  const list = document.getElementById('file-list');
+  list.innerHTML = '<div style="padding:20px;color:var(--sub);font-family:var(--mono);text-align:center;font-size:13px">Loading…</div>';
+  document.getElementById('path-display').textContent = currentPath;
+  try {
+    const r = await fetch('/api/files/list?path=' + encodeURIComponent(currentPath));
+    const d = await r.json();
+    if (d.error) { list.innerHTML = `<div style="padding:20px;color:var(--red);font-family:var(--mono)">${d.error}</div>`; return; }
+    currentPath = d.path;
+    document.getElementById('path-display').textContent = d.path;
+    document.getElementById('btn-back').disabled = d.path === d.parent;
+
+    list.innerHTML = d.entries.map(e => `
+      <div class="file-item" onclick="${e.is_dir ? `filesNav('${e.path.replace(/'/g,"\\'")}')` : ''}">
+        <span class="file-ico">${fileIcon(e)}</span>
+        <div style="flex:1;min-width:0">
+          <div class="file-name">${e.name}</div>
+          <div class="file-meta">${e.is_dir ? 'folder' : fmtSize(e.size)} · ${fmtDate(e.modified)}</div>
+        </div>
+        ${!e.is_dir ? `
+        <div class="file-actions" onclick="event.stopPropagation()">
+          <button class="file-act-btn dl" onclick="dlFile('${e.path.replace(/'/g,"\\'")}')">↓</button>
+          <button class="file-act-btn del" onclick="delFile('${e.path.replace(/'/g,"\\'")}','${e.name.replace(/'/g,"\\'")}')">✕</button>
+        </div>` : ''}
+      </div>`).join('') || '<div style="padding:20px;color:var(--sub);text-align:center;font-size:13px">Empty folder</div>';
+  } catch(e) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red);font-family:var(--mono)">Error: ${e.message}</div>`;
+  }
+}
+
+function dlFile(path) {
+  const a = document.createElement('a');
+  a.href = '/api/files/download?path=' + encodeURIComponent(path);
+  a.download = path.split('/').pop();
+  a.click();
+  toast('↓ Downloading…');
+}
+
+async function delFile(path, name) {
+  if (!confirm(`Delete "${name}"?`)) return;
+  const r = await fetch('/api/files/delete', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({path})
+  });
+  const d = await r.json();
+  if (d.ok) { toast('🗑 Deleted'); filesRefresh(); }
+  else toast('Error: ' + d.error);
+}
+
+async function mkdirPrompt() {
+  const name = prompt('New folder name:');
+  if (!name) return;
+  const r = await fetch('/api/files/mkdir', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({path: currentPath + '/' + name})
+  });
+  const d = await r.json();
+  if (d.ok) { toast('📁 Created'); filesRefresh(); }
+}
+
+async function uploadFiles(files) {
+  if (!files.length) return;
+  toast('📤 Uploading ' + files.length + ' file(s)…');
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  const r = await fetch('/api/files/upload?dest=' + encodeURIComponent(currentPath), {
+    method:'POST', body: fd
+  });
+  const d = await r.json();
+  if (d.ok) { toast('✓ Uploaded: ' + d.saved.join(', ')); filesRefresh(); }
+  else toast('Upload error: ' + (d.error||'unknown'));
+}
+
+// Drag & drop on drop zone
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  uploadFiles(e.dataTransfer.files);
+});
+
+// ═══════════════════════════════════════════════════════════
+//  TERMINAL
+// ═══════════════════════════════════════════════════════════
+const termOut = document.getElementById('term-out');
+const termIn  = document.getElementById('term-in');
+
+async function termRun() {
+  const cmd = termIn.value.trim();
+  if (!cmd) return;
+  termHistory.unshift(cmd); termIdx = -1;
+  termOut.textContent += '\n$ ' + cmd + '\n';
+  termIn.value = '';
+  try {
+    const r = await fetch('/api/run', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({cmd})
+    });
+    const d = await r.json();
+    termOut.textContent += (d.output || d.error || '(no output)') + '\n';
+  } catch(e) {
+    termOut.textContent += '[connection error]\n';
+  }
+  termOut.scrollTop = termOut.scrollHeight;
+}
+
+termIn.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { termRun(); return; }
+  if (e.key === 'ArrowUp') {
+    termIdx = Math.min(termIdx+1, termHistory.length-1);
+    termIn.value = termHistory[termIdx] || '';
+  }
+  if (e.key === 'ArrowDown') {
+    termIdx = Math.max(termIdx-1, -1);
+    termIn.value = termIdx >= 0 ? termHistory[termIdx] : '';
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════
+let _toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+// Auto-start stream after a beat
+setTimeout(startStream, 600);
+// Auto-start audio (requires user gesture — triggered by startStream button)
+img.addEventListener('load', () => {
+  if (!audioActive) startAudio();
+}, {once: true});
+
+// Wake lock — keep iPad screen on
+async function keepAwake() {
+  if ('wakeLock' in navigator) {
+    try { await navigator.wakeLock.request('screen'); } catch {}
+  }
+}
+keepAwake();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake();
+});
+</script>
+</body>
+</html>
