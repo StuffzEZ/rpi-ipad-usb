@@ -43,13 +43,25 @@ def get_display_res():
 # ── SYSTEM STATS ──────────────────────────────────────────
 
 def cpu_temp():
-    raw = run("vcgencmd measure_temp 2>/dev/null || cat /sys/class/thermal/thermal_zone0/temp")
+    # vcgencmd works on all Pi models
+    raw = run("vcgencmd measure_temp 2>/dev/null")
     if "temp=" in raw:
         return raw.replace("temp=","").replace("'C","")
+    # Pi 5 fallback: thermal_zone0 is the SoC temp
+    for zone in ["/sys/class/thermal/thermal_zone0/temp",
+                 "/sys/class/thermal/thermal_zone1/temp"]:
+        try:
+            val = open(zone).read().strip()
+            return str(round(int(val)/1000, 1))
+        except Exception:
+            continue
+    return "N/A"
+
+def pi_model():
     try:
-        return str(round(int(raw)/1000,1))
-    except:
-        return "N/A"
+        return open("/proc/device-tree/model","r").read().replace('\x00','').strip()
+    except Exception:
+        return run("cat /proc/device-tree/model 2>/dev/null || echo Unknown")
 
 def cpu_percent():
     return run("top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4}'") or "0"
@@ -448,20 +460,24 @@ def files_rename():
 def stats():
     mem  = mem_info()
     disk = disk_info()
+    # Gadget status
+    udc_bound = bool(run("cat /sys/kernel/config/usb_gadget/rpi-link/UDC 2>/dev/null"))
     return jsonify({
-        "hostname": run("hostname"),
-        "uptime":   run("uptime -p").replace("up ",""),
-        "cpu":      cpu_percent(),
-        "temp":     cpu_temp(),
-        "mem":      mem,
-        "disk":     disk,
-        "usb_ip":   run("ip addr show usb0 2>/dev/null | grep 'inet ' | awk '{print $2}'") or "not connected",
-        "net":      net_stats(),
-        "processes":processes(),
-        "time":     time.strftime("%H:%M:%S"),
-        "date":     time.strftime("%A %d %B %Y"),
-        "display":  "%dx%d" % get_display_res(),
-        "stream":   _capture_settings,
+        "hostname":  run("hostname"),
+        "model":     pi_model(),
+        "uptime":    run("uptime -p").replace("up ",""),
+        "cpu":       cpu_percent(),
+        "temp":      cpu_temp(),
+        "mem":       mem,
+        "disk":      disk,
+        "usb_ip":    run("ip addr show usb0 2>/dev/null | grep 'inet ' | awk '{print $2}'") or "not connected",
+        "net":       net_stats(),
+        "processes": processes(),
+        "time":      time.strftime("%H:%M:%S"),
+        "date":      time.strftime("%A %d %B %Y"),
+        "display":   "%dx%d" % get_display_res(),
+        "stream":    _capture_settings,
+        "gadget_ok": udc_bound,
     })
 
 BLOCKED = ["rm -rf","mkfs","dd ","shutdown","reboot","passwd","wget","curl","chmod 777"]
