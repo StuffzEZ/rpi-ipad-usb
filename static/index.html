@@ -488,9 +488,11 @@ input[type=range]::-webkit-slider-thumb {
 
     <div class="section-title">Info</div>
     <div class="card">
+      <div class="card-row"><span class="row-icon">🍓</span><span class="row-label">model</span>   <span class="row-val" id="i-model">—</span></div>
       <div class="card-row"><span class="row-icon">🖥</span><span class="row-label">hostname</span><span class="row-val" id="i-host">—</span></div>
       <div class="card-row"><span class="row-icon">⏱</span><span class="row-label">uptime</span>  <span class="row-val" id="i-up">—</span></div>
       <div class="card-row"><span class="row-icon">🔌</span><span class="row-label">usb ip</span>  <span class="row-val" id="i-ip">—</span></div>
+      <div class="card-row"><span class="row-icon">⚡</span><span class="row-label">gadget</span>  <span class="row-val" id="i-gadget">—</span></div>
       <div class="card-row"><span class="row-icon">📡</span><span class="row-label">display</span> <span class="row-val" id="i-disp">—</span></div>
       <div class="card-row"><span class="row-icon">🗓</span><span class="row-label">date</span>    <span class="row-val" id="i-date">—</span></div>
       <div class="card-row"><span class="row-icon">↕</span><span class="row-label">net rx/tx</span><span class="row-val" id="i-net">—</span></div>
@@ -1002,11 +1004,15 @@ async function pollStats() {
     document.getElementById('s-disk-bar').style.width = parseInt(dk.pct)||0+'%';
 
     // info
-    document.getElementById('i-host').textContent = d.hostname||'—';
-    document.getElementById('i-up').textContent   = d.uptime||'—';
-    document.getElementById('i-ip').textContent   = d.usb_ip||'—';
-    document.getElementById('i-disp').textContent = d.display||'—';
-    document.getElementById('i-date').textContent = d.date||'—';
+    document.getElementById('i-model').textContent  = d.model||'—';
+    document.getElementById('i-host').textContent   = d.hostname||'—';
+    document.getElementById('i-up').textContent     = d.uptime||'—';
+    document.getElementById('i-ip').textContent     = d.usb_ip||'—';
+    const gadgetEl = document.getElementById('i-gadget');
+    gadgetEl.textContent = d.gadget_ok ? '✓ bound' : '✗ not bound';
+    gadgetEl.style.color = d.gadget_ok ? 'var(--green)' : 'var(--red)';
+    document.getElementById('i-disp').textContent   = d.display||'—';
+    document.getElementById('i-date').textContent   = d.date||'—';
     const net = d.net||{};
     document.getElementById('i-net').textContent = `↓${fmtBytes(net.rx)} ↑${fmtBytes(net.tx)}`;
 
