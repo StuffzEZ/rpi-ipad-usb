@@ -21,8 +21,8 @@ step()  { echo -e "\n${CYN}${BLD}── $1 ──${NC}"; }
 # ── Configuration ──────────────────────────────────────────
 # Edit these before running setup.sh
 
-HOTSPOT_SSID="RPiLink"          # Network name (hidden, so clients must know it)
-HOTSPOT_PASS="raspberry123"     # WPA2 password (min 8 chars)
+HOTSPOT_SSID="remotePi-v4-aaej9ce-$(tr -dc a-z0-9 </dev/urandom | head -c2)"         # Network name (hidden, so clients must know it)
+HOTSPOT_PASS="AAEEjjHH990011kkLo@"      # WPA2 password (min 8 chars)
 HOTSPOT_CHANNEL="6"             # WiFi channel (1, 6, or 11 recommended)
 HOTSPOT_IP="10.42.0.1"          # Pi's IP on the hotspot network
 DHCP_RANGE_START="10.42.0.10"
@@ -324,6 +324,8 @@ echo -e "${GRN}${BLD}╚══════════════════�
 echo ""
 echo -e "  ${YLW}The network is HIDDEN — iPad must use 'Other Network...' to join${NC}"
 echo -e "  ${YLW}WiFi adapter detected: ${WIFI_IFACE}${NC}"
+echo ""
+echo -e " ${YLW} REMEMBER: You must remember the SSID and Password to get onto the wifi network. Maybe take a photo of this information. The only differentiation of the network SSID from other devices using this program is the last 2 letters so if you need to you only have to remember the last two letters. Aswell, the password is the same on all devices."
 echo ""
 echo -e "After reboot, verify:"
 echo -e "  ${CYN}sudo systemctl status hostapd${NC}"
